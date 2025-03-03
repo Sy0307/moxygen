@@ -21,6 +21,7 @@ DEFINE_string(cert, "", "Cert path");
 DEFINE_string(key, "", "Key path");
 DEFINE_int32(port, 9667, "Server Port");
 DEFINE_bool(stream_per_object, false, "Use one stream for each object");
+DEFINE_bool(datagrams, true, "Use one datagram for each object");
 
 namespace {
 using namespace moxygen;
@@ -29,10 +30,11 @@ class MoQDateServer : public MoQServer,
                       public Publisher,
                       public std::enable_shared_from_this<MoQDateServer> {
  public:
-  explicit MoQDateServer(bool streamPerObject)
-      : MoQServer(FLAGS_port, FLAGS_cert, FLAGS_key, "/moq-date"),
-        forwarder_(dateTrackName()),
-        streamPerObject_(streamPerObject) {}
+  MoQDateServer(bool streamPerObject, bool datagram)
+       : MoQServer(FLAGS_port, FLAGS_cert, FLAGS_key, "/moq-date"),
+         forwarder_(dateTrackName()),
+        streamPerObject_(streamPerObject),
+        datagrams_(datagram) {}
 
   bool startRelayClient(folly::EventBase* evb) {
     proxygen::URL url(FLAGS_relay_url);
@@ -266,6 +268,8 @@ class MoQDateServer : public MoQServer,
         auto in_time_t = std::chrono::system_clock::to_time_t(now);
         if (streamPerObject_) {
           publishDate(uint64_t(in_time_t / 60), uint64_t(in_time_t % 60));
+        } else if (datagrams_) {
+          publishDategram(uint64_t(in_time_t / 60), uint64_t(in_time_t % 60));
         } else {
           subgroupPublisher = publishDate(
               subgroupPublisher,
@@ -325,6 +329,33 @@ class MoQDateServer : public MoQServer,
     }
   }
 
+
+  void publishDategram(uint64_t group, uint64_t second) {
+    uint64_t subgroup = second;
+    uint64_t object = second;
+    ObjectHeader header{
+        TrackAlias(0),
+        group,
+        subgroup,
+        object,
+        /*priority=*/0,
+        ObjectStatus::NORMAL,
+        folly::none};
+    if (second == 0) {
+      forwarder_.datagram(header, minutePayload(group));
+    }
+    header.subgroup++;
+    header.id++;
+    forwarder_.datagram(header, secondPayload(header.id));
+    if (header.id >= 60) {
+      header.subgroup++;
+      header.id++;
+      header.status = ObjectStatus::END_OF_GROUP;
+      forwarder_.datagram(header, nullptr);
+    }
+  }
+
+
   void terminateClientSession(std::shared_ptr<MoQSession> session) override {
     XLOG(INFO) << __func__;
     forwarder_.removeSession(session);
@@ -337,13 +368,16 @@ class MoQDateServer : public MoQServer,
   MoQForwarder forwarder_;
   std::unique_ptr<MoQRelayClient> relayClient_;
   bool streamPerObject_{false};
+  bool datagrams_{false};
   bool loopRunning_{false};
 };
 } // namespace
 int main(int argc, char* argv[]) {
   folly::Init init(&argc, &argv, true);
   folly::EventBase evb;
-  auto server = std::make_shared<MoQDateServer>(FLAGS_stream_per_object);
+  // auto server = std::make_shared<MoQDateServer>(FLAGS_stream_per_object);
+  auto server =
+    std::make_shared<MoQDateServer>(FLAGS_stream_per_object, FLAGS_datagrams);
   if (!FLAGS_relay_url.empty() && !server->startRelayClient(&evb)) {
     return 1;
   }

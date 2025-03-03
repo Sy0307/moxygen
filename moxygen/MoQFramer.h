@@ -157,7 +157,8 @@ constexpr uint64_t kVersionDraft06_exp =
 constexpr uint64_t kVersionDraft07_exp = 0xff070001; // Draft 7 FETCH support
 constexpr uint64_t kVersionDraft07_exp2 =
     0xff070002; // Draft 7 FETCH + removal of Subscribe ID on objects
-constexpr uint64_t kVersionDraft08 = 0xff080001; // Draft 8 no ROLE
+constexpr uint64_t kVersionDraft08_exp = 0xff080001; // Draft 8 no ROLE
+constexpr uint64_t kVersionDraft08 = 0xff000008; // Draft 8 no ROLE
 constexpr uint64_t kVersionDraftCurrent = kVersionDraft08;
 
 struct ClientSetup {
