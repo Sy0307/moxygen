@@ -13,8 +13,12 @@ namespace moxygen {
 
 class MoQRelayClient {
  public:
-  MoQRelayClient(folly::EventBase* evb, proxygen::URL url)
-      : moqClient_(evb, std::move(url)) {}
+  MoQRelayClient(
+      folly::EventBase* evb,
+      proxygen::URL url,
+      MoQClient::TransportType ttype =
+          MoQClient::TransportType::H3_WEBTRANSPORT)
+      : moqClient_(evb, std::move(url), ttype) {}
 
   folly::coro::Task<void> run(
       std::shared_ptr<Publisher> publisher,
@@ -23,6 +27,7 @@ class MoQRelayClient {
       std::chrono::milliseconds connectTimeout = std::chrono::seconds(5),
       std::chrono::milliseconds transactionTimeout = std::chrono::seconds(60)) {
     try {
+      bool isPublisher = bool(publisher);
       co_await moqClient_.setupMoQSession(
           connectTimeout,
           transactionTimeout,
@@ -43,6 +48,21 @@ class MoQRelayClient {
                     << " reason=" << res.error().reasonPhrase;
         } else {
           announceHandles_.emplace_back(std::move(res.value()));
+        }
+      }
+      if (isPublisher) {
+        while (moqClient_.moqSession_) {
+          co_await folly::coro::sleep(std::chrono::seconds(30));
+          if (!moqClient_.moqSession_) {
+            break;
+          }
+          Announce ann;
+          ann.trackNamespace.trackNamespace.push_back("ping");
+          auto handle = co_await moqClient_.moqSession_->announce(ann);
+          if (handle.hasError()) {
+            break;
+          }
+          handle.value()->unannounce();
         }
       }
     } catch (const std::exception& ex) {
