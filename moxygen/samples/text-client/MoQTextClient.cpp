@@ -22,7 +22,7 @@ DEFINE_string(so, "", "Start object, defaults to 0 when sg is set or latest");
 DEFINE_string(eg, "", "End group");
 DEFINE_int32(connect_timeout, 1000, "Connect timeout (ms)");
 DEFINE_int32(transaction_timeout, 120, "Transaction timeout (s)");
-DEFINE_bool(quic_transport, false, "Use raw QUIC transport");
+DEFINE_bool(quic_transport, true, "Use raw QUIC transport");
 DEFINE_bool(fetch, false, "Use fetch rather than subscribe");
 DEFINE_bool(jfetch, false, "Joining fetch");
 

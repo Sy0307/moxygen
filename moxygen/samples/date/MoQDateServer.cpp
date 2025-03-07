@@ -26,6 +26,7 @@ DEFINE_string(
     "Transmission mode for track: stream-per-group (spg), "
     "stream-per-object(spo), datagram");
 DEFINE_bool(quic_transport, false, "Use raw QUIC transport");
+DEFINE_bool(datagrams, true, "Use one datagram for each object");
 
 namespace {
 using namespace moxygen;
